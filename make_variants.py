@@ -2,15 +2,14 @@
 """Make K subtly different variants of every video in ./originals/.
 
 Each variant gets fresh random values for:
-  - One near-black frame (random RGB 0-8) at the very start and very end,
-    with silence padded into the audio so it stays in sync
   - Zoom of 105-112%, cropped back to 1080x1920 (no letterboxing)
   - A small reposition of the zoomed frame that keeps the centre in view
-  - On about half the variants, a 1-2 degree rotation; the zoom is raised
-    if needed so no black corners ever show
-  - A light colour adjustment: contrast, saturation, warmth, sharpness
+  - A minimal colour adjustment: contrast, saturation, warmth, sharpness
 
-No mirroring, no AI upscaling, no other effects.
+Every variant also gets exactly one pure black frame at the very start and
+very end, with silence padded into the audio so it stays in sync.
+
+No tilt, no mirroring, no AI upscaling, no other effects.
 
 Export: H.264 High, 1080x1920, original frame rate, CRF 16 (capped at
 20 Mbps), AAC 320k, +faststart. Every variant's settings are appended to
@@ -73,66 +72,25 @@ def source_fps(video):
             59.94: "60000/1001"}.get(fps, f"{fps:g}")
 
 
-def fits(zoom, angle_deg, dx, dy):
-    """True if a crop offset by (dx, dy) shows no rotated-in corners.
-
-    The frame is rotated about its centre, then scaled by `zoom`, then a
-    WxH window is cropped with its centre offset by (dx, dy) pixels. Every
-    window corner, mapped back through the zoom and rotation, must land
-    inside the original WxH frame.
-    """
-    a = math.radians(angle_deg)
-    cos_a, sin_a = math.cos(a), math.sin(a)
-    for sx in (-1, 1):
-        for sy in (-1, 1):
-            x = (dx + sx * W / 2) / zoom
-            y = (dy + sy * H / 2) / zoom
-            xr = x * cos_a + y * sin_a
-            yr = -x * sin_a + y * cos_a
-            if abs(xr) > W / 2 + 1e-6 or abs(yr) > H / 2 + 1e-6:
-                return False
-    return True
-
-
-def min_zoom_for_rotation(angle_deg):
-    a = math.radians(abs(angle_deg))
-    return math.cos(a) + (H / W) * math.sin(a)
-
-
 def pick_params(rng):
     zoom = rng.uniform(1.05, 1.12)
-    angle = 0.0
-    if rng.random() < 0.5:
-        angle = rng.uniform(1.0, 2.0) * rng.choice([-1, 1])
-        # Raise the zoom if needed, with headroom left for the reposition
-        zoom = max(zoom, min_zoom_for_rotation(angle) + 0.01)
-
     # Reposition: at most 3% of the frame each way so the centre stays put,
-    # shrunk until no corners show
-    fx, fy = rng.uniform(-1, 1), rng.uniform(-1, 1)
+    # and never more than the zoom leaves room for
     max_dx = min((zoom - 1) * W / 2, 0.03 * W)
     max_dy = min((zoom - 1) * H / 2, 0.03 * H)
-    scale = 1.0
-    while scale > 0 and not fits(zoom, angle, fx * max_dx * scale,
-                                 fy * max_dy * scale):
-        scale -= 0.05
-    scale = max(scale, 0.0)
-
-    def near_black():
-        return "%02x%02x%02x" % tuple(rng.randint(0, 8) for _ in range(3))
 
     return {
         "zoom": round(zoom, 3),
-        "rotation_deg": round(angle, 2),
-        "offset_x": round(fx * max_dx * scale),
-        "offset_y": round(fy * max_dy * scale),
-        # ~75%-strength filter: small nudges, not a visible style change
-        "contrast": round(rng.uniform(1.01, 1.06), 3),
-        "saturation": round(rng.uniform(1.02, 1.10), 3),
-        "temperature": rng.randint(6100, 6900),  # 6500 = neutral
-        "sharpness": round(rng.uniform(0.15, 0.45), 2),
-        "start_rgb": near_black(),
-        "end_rgb": near_black(),
+        "rotation_deg": 0.0,  # tilt is off; column kept for the log
+        "offset_x": round(rng.uniform(-1, 1) * max_dx),
+        "offset_y": round(rng.uniform(-1, 1) * max_dy),
+        # Minimal filter: present but barely noticeable
+        "contrast": round(rng.uniform(1.01, 1.03), 3),
+        "saturation": round(rng.uniform(1.01, 1.05), 3),
+        "temperature": rng.randint(6300, 6700),  # 6500 = neutral
+        "sharpness": round(rng.uniform(0.10, 0.25), 2),
+        "start_rgb": "000000",
+        "end_rgb": "000000",
     }
 
 
@@ -154,10 +112,6 @@ def build_video_filter(p, fps, video):
         f"fps={fps}",
         f"scale={W}:{H}:force_original_aspect_ratio=increase:flags=lanczos",
         f"crop={W}:{H}",
-    ]
-    if p["rotation_deg"]:
-        steps.append(f"rotate={p['rotation_deg']}*PI/180:fillcolor=black")
-    steps += [
         f"scale={zw}:{zh}:flags=lanczos",
         f"crop={W}:{H}:{crop_x}:{crop_y}",
         f"eq=contrast={p['contrast']}:saturation={p['saturation']}",
