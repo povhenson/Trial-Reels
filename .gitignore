@@ -1,3 +1,4 @@
 output/
 originals/
 variants/
+__pycache__/
