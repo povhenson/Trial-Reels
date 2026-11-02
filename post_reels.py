@@ -132,8 +132,8 @@ def publish(video, token, user_id, video_url=None):
         {"fields": "is_shared_to_feed,permalink", "access_token": token}))
     print(f"permalink: {media.get('permalink')}")
     if media.get("is_shared_to_feed"):
-        print("WARNING: Instagram shared this to the feed, so it is a normal "
-              "reel, not a trial reel")
+        print("WARNING: Instagram reports this as shared to the feed; check "
+              "in the app whether it posted as a trial reel")
     return container_id, media_id
 
 
@@ -176,7 +176,7 @@ def main():
             "variant": video.name, "original": original_of(video.name),
             "container_id": container_id, "media_id": media_id,
         })
-    print(f"posted as trial reel: media {media_id}")
+    print(f"posted: media {media_id}")
 
 
 if __name__ == "__main__":
