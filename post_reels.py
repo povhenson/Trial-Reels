@@ -76,11 +76,14 @@ def pick_next(variants_dir, log_path):
     return candidates[0] if candidates else None
 
 
-def publish(video, token, user_id):
-    # 1. Create a resumable-upload reel container, marked as a trial reel
+def publish(video, token, user_id, video_url=None):
+    # 1. Create a reel container marked as a trial reel. With video_url,
+    #    Instagram fetches the file itself; otherwise we upload it below
+    source = ({"video_url": video_url} if video_url
+              else {"upload_type": "resumable"})
     container = request("POST", f"{GRAPH}/{user_id}/media", data={
         "media_type": "REELS",
-        "upload_type": "resumable",
+        **source,
         "caption": CAPTION,
         "trial_params": json.dumps(TRIAL_PARAMS),
         # Trial reels must not go to followers' feeds; the API defaults this
@@ -92,13 +95,14 @@ def publish(video, token, user_id):
     print(f"container {container_id} created")
 
     # 2. Upload the video bytes
-    data = video.read_bytes()
-    request("POST", f"{RUPLOAD}/{container_id}", body=data, headers={
-        "Authorization": f"OAuth {token}",
-        "offset": "0",
-        "file_size": str(len(data)),
-    })
-    print(f"uploaded {len(data) / 1e6:.1f} MB")
+    if not video_url:
+        data = video.read_bytes()
+        request("POST", f"{RUPLOAD}/{container_id}", body=data, headers={
+            "Authorization": f"OAuth {token}",
+            "offset": "0",
+            "file_size": str(len(data)),
+        })
+        print(f"uploaded {len(data) / 1e6:.1f} MB")
 
     # 3. Wait for Instagram to finish processing
     deadline = time.monotonic() + STATUS_TIMEOUT_SECS
@@ -136,6 +140,9 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--variants", default="variants")
     ap.add_argument("--log", default="posted_log.csv")
+    ap.add_argument("--video-url",
+                    help="public URL of the chosen variant for Instagram to "
+                         "fetch, instead of uploading the file directly")
     ap.add_argument("--dry-run", action="store_true",
                     help="show what would be posted without posting")
     args = ap.parse_args()
@@ -157,7 +164,7 @@ def main():
         raise SystemExit("Set IG_ACCESS_TOKEN first")
     token = token.strip()
 
-    container_id, media_id = publish(video, token, user_id)
+    container_id, media_id = publish(video, token, user_id, args.video_url)
     new_log = not log_path.exists()
     with log_path.open("a", newline="") as f:
         writer = csv.DictWriter(f, fieldnames=LOG_FIELDS)
