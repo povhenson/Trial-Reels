@@ -10,9 +10,10 @@ Picks the oldest unposted variant, preferring a different original than the
 last post so the same video doesn't go up twice in a row. Every post is
 appended to posted_log.csv and a variant is never posted twice.
 
-Needs these environment variables (from the Meta developer app):
-  IG_ACCESS_TOKEN   long-lived Instagram user access token
-  IG_USER_ID        the Instagram account's user ID
+Needs IG_ACCESS_TOKEN in the environment: a never-expiring system-user
+token from the Povhenson business portfolio (Trial Reels Poster app) with
+instagram_basic and instagram_content_publish. IG_USER_ID can override the
+Instagram business account ID, which defaults to @pov_henson.
 
 Usage:
   python3 post_reels.py [--variants variants] [--dry-run]
@@ -31,8 +32,9 @@ from pathlib import Path
 CAPTION = "For example ahh creator\U0001F494\U0001F494"
 TRIAL_PARAMS = {"graduation_strategy": "MANUAL"}
 GRAPH_VERSION = os.environ.get("IG_GRAPH_VERSION", "v24.0")
-GRAPH = f"https://graph.instagram.com/{GRAPH_VERSION}"
+GRAPH = f"https://graph.facebook.com/{GRAPH_VERSION}"
 RUPLOAD = f"https://rupload.facebook.com/ig-api-upload/{GRAPH_VERSION}"
+DEFAULT_IG_USER_ID = "17841477461100385"  # @pov_henson
 LOG_FIELDS = ["posted", "variant", "original", "container_id", "media_id"]
 STATUS_TIMEOUT_SECS = 600
 
@@ -138,9 +140,10 @@ def main():
         return
 
     token = os.environ.get("IG_ACCESS_TOKEN")
-    user_id = os.environ.get("IG_USER_ID")
-    if not token or not user_id:
-        raise SystemExit("Set IG_ACCESS_TOKEN and IG_USER_ID first")
+    user_id = os.environ.get("IG_USER_ID", DEFAULT_IG_USER_ID)
+    if not token:
+        raise SystemExit("Set IG_ACCESS_TOKEN first")
+    token = token.strip()
 
     container_id, media_id = publish(video, token, user_id)
     new_log = not log_path.exists()
