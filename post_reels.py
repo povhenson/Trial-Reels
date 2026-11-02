@@ -83,6 +83,9 @@ def publish(video, token, user_id):
         "upload_type": "resumable",
         "caption": CAPTION,
         "trial_params": json.dumps(TRIAL_PARAMS),
+        # Trial reels must not go to followers' feeds; the API defaults this
+        # to true, which publishes a normal reel even with trial_params set
+        "share_to_feed": "false",
         "access_token": token,
     })
     container_id = container["id"]
@@ -117,7 +120,16 @@ def publish(video, token, user_id):
         "creation_id": container_id,
         "access_token": token,
     })
-    return container_id, result["id"]
+    media_id = result["id"]
+
+    # 5. Check it didn't go out as a normal reel
+    media = request("GET", f"{GRAPH}/{media_id}?" + urllib.parse.urlencode(
+        {"fields": "is_shared_to_feed,permalink", "access_token": token}))
+    print(f"permalink: {media.get('permalink')}")
+    if media.get("is_shared_to_feed"):
+        print("WARNING: Instagram shared this to the feed, so it is a normal "
+              "reel, not a trial reel")
+    return container_id, media_id
 
 
 def main():
