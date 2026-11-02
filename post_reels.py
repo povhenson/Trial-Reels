@@ -11,8 +11,10 @@ last post so the same video doesn't go up twice in a row. Every post is
 appended to posted_log.csv and a variant is never posted twice.
 
 Needs these environment variables (from the Meta developer app):
-  IG_ACCESS_TOKEN   long-lived Instagram user access token
-  IG_USER_ID        the Instagram account's user ID
+  IG_ACCESS_TOKEN   long-lived access token: an Instagram Login token
+                    (IGAA...) or a Facebook Login / system user token (EAA...)
+  IG_USER_ID        the Instagram account's user ID (for EAA tokens, the
+                    Instagram business account ID linked to the Page)
 
 Usage:
   python3 post_reels.py [--variants variants] [--dry-run]
@@ -31,7 +33,6 @@ from pathlib import Path
 CAPTION = "For example ahh creator\U0001F494\U0001F494"
 TRIAL_PARAMS = {"graduation_strategy": "MANUAL"}
 GRAPH_VERSION = os.environ.get("IG_GRAPH_VERSION", "v24.0")
-GRAPH = f"https://graph.instagram.com/{GRAPH_VERSION}"
 RUPLOAD = f"https://rupload.facebook.com/ig-api-upload/{GRAPH_VERSION}"
 LOG_FIELDS = ["posted", "variant", "original", "container_id", "media_id"]
 STATUS_TIMEOUT_SECS = 600
@@ -50,6 +51,14 @@ def request(method, url, data=None, headers=None, body=None):
         detail = e.read().decode(errors="replace")
         raise SystemExit(f"{method} {url.split('?')[0]} failed "
                          f"({e.code}): {detail}") from None
+
+
+def graph_base(token):
+    # Facebook Login tokens (incl. system users) start with EAA and only work
+    # on graph.facebook.com; Instagram Login tokens use graph.instagram.com
+    host = "graph.facebook.com" if token.startswith("EAA") \
+        else "graph.instagram.com"
+    return f"https://{host}/{GRAPH_VERSION}"
 
 
 def original_of(variant_name):
@@ -75,8 +84,9 @@ def pick_next(variants_dir, log_path):
 
 
 def publish(video, token, user_id):
+    graph = graph_base(token)
     # 1. Create a resumable-upload reel container, marked as a trial reel
-    container = request("POST", f"{GRAPH}/{user_id}/media", data={
+    container = request("POST", f"{graph}/{user_id}/media", data={
         "media_type": "REELS",
         "upload_type": "resumable",
         "caption": CAPTION,
@@ -98,7 +108,7 @@ def publish(video, token, user_id):
     # 3. Wait for Instagram to finish processing
     deadline = time.monotonic() + STATUS_TIMEOUT_SECS
     while True:
-        status = request("GET", f"{GRAPH}/{container_id}?" + urllib.parse
+        status = request("GET", f"{graph}/{container_id}?" + urllib.parse
                          .urlencode({"fields": "status_code,status",
                                      "access_token": token}))
         code = status.get("status_code")
@@ -111,7 +121,7 @@ def publish(video, token, user_id):
         time.sleep(10)
 
     # 4. Publish
-    result = request("POST", f"{GRAPH}/{user_id}/media_publish", data={
+    result = request("POST", f"{graph}/{user_id}/media_publish", data={
         "creation_id": container_id,
         "access_token": token,
     })
