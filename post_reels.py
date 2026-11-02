@@ -81,16 +81,17 @@ def publish(video, token, user_id, video_url=None):
     #    Instagram fetches the file itself; otherwise we upload it below
     source = ({"video_url": video_url} if video_url
               else {"upload_type": "resumable"})
-    container = request("POST", f"{GRAPH}/{user_id}/media", data={
+    # JSON body with trial_params as a real object, as in Meta's example.
+    # No share_to_feed or collaborators: they conflict with trial reels
+    container = request("POST", f"{GRAPH}/{user_id}/media", headers={
+        "Authorization": f"Bearer {token}",
+        "Content-Type": "application/json",
+    }, body=json.dumps({
         "media_type": "REELS",
         **source,
         "caption": CAPTION,
-        "trial_params": json.dumps(TRIAL_PARAMS),
-        # Trial reels must not go to followers' feeds; the API defaults this
-        # to true, which publishes a normal reel even with trial_params set
-        "share_to_feed": "false",
-        "access_token": token,
-    })
+        "trial_params": TRIAL_PARAMS,
+    }).encode())
     container_id = container["id"]
     print(f"container {container_id} created")
 
