@@ -5,6 +5,9 @@ Each variant gets fresh random values for:
   - Zoom of 105-112%, cropped back to 1080x1920 (no letterboxing)
   - A small reposition of the zoomed frame that keeps the centre in view
   - A minimal colour adjustment: contrast, saturation, warmth, sharpness
+  - A few frames trimmed off the start and end (up to 0.2s each)
+  - Playback speed of 97-103%, with the audio tempo matched (pitch kept)
+  - A small audio level change (-1.5 to +1 dB)
 
 Every variant also gets exactly one pure black frame at the very start and
 very end, with silence padded into the audio so it stays in sync.
@@ -37,21 +40,26 @@ LOG_FIELDS = [
     "created", "original", "variant", "fps", "zoom", "rotation_deg",
     "offset_x", "offset_y", "contrast", "saturation", "temperature",
     "sharpness", "start_rgb", "end_rgb", "crf", "audio_bitrate",
+    "trim_start", "trim_end", "speed", "audio_gain_db",
 ]
 # Fields that together define a "combination" for the no-repeat rule
 COMBO_FIELDS = [
     "zoom", "rotation_deg", "offset_x", "offset_y", "contrast",
     "saturation", "temperature", "sharpness", "start_rgb", "end_rgb",
+    "trim_start", "trim_end", "speed", "audio_gain_db",
 ]
 
 
 def probe(path):
     out = subprocess.run(
-        ["ffprobe", "-v", "error", "-show_streams", "-of", "json", str(path)],
+        ["ffprobe", "-v", "error", "-show_streams", "-show_format",
+         "-of", "json", str(path)],
         capture_output=True, text=True, check=True,
     ).stdout
-    streams = json.loads(out)["streams"]
+    info = json.loads(out)
+    streams = info["streams"]
     video = next(s for s in streams if s["codec_type"] == "video")
+    video.setdefault("duration", info["format"]["duration"])
     has_audio = any(s["codec_type"] == "audio" for s in streams)
     return video, has_audio
 
@@ -91,6 +99,13 @@ def pick_params(rng):
         "sharpness": round(rng.uniform(0.10, 0.25), 2),
         "start_rgb": "000000",
         "end_rgb": "000000",
+        # Timing changes: shifts every frame and the audio against the
+        # original, and changes the length
+        "trim_start": round(rng.uniform(0.0, 0.2), 3),
+        "trim_end": round(rng.uniform(0.0, 0.2), 3),
+        "speed": round(rng.choice([rng.uniform(0.97, 0.99),
+                                   rng.uniform(1.01, 1.03)]), 3),
+        "audio_gain_db": round(rng.uniform(-1.5, 1.0), 1),
     }
 
 
@@ -108,7 +123,10 @@ def build_video_filter(p, fps, video):
             "zscale=p=bt709", "tonemap=hable:desat=0",
             "zscale=t=bt709:m=bt709:r=tv",
         ]
+    end = float(video["duration"]) - p["trim_end"]
     steps += [
+        f"trim=start={p['trim_start']}:end={end:.3f}",
+        f"setpts=(PTS-STARTPTS)/{p['speed']}",
         f"fps={fps}",
         f"scale={W}:{H}:force_original_aspect_ratio=increase:flags=lanczos",
         f"crop={W}:{H}",
@@ -130,13 +148,16 @@ def render(src, dst, p, fps, video, has_audio):
     cmd = ["ffmpeg", "-y", "-v", "error", "-i", str(src),
            "-vf", build_video_filter(p, fps, video), "-map", "0:v:0"]
     if has_audio:
-        # Trim audio to the video's length, delay it by the lead-in frame,
-        # then pad with silence; -shortest ends it with the last frame
+        # Same trim and speed as the video (atempo keeps the pitch), delay it
+        # by the lead-in frame, then pad with silence; -shortest ends it with
+        # the last frame
         pad = round(AUDIO_RATE * frame_secs)
-        trim = f"atrim=end={video['duration']}," if "duration" in video else ""
+        end = float(video["duration"]) - p["trim_end"]
         cmd += ["-map", "0:a:0",
-                "-af", f"{trim}aresample={AUDIO_RATE},adelay={pad}S:all=1,"
-                       "apad",
+                "-af", f"atrim=start={p['trim_start']}:end={end:.3f},"
+                       f"asetpts=PTS-STARTPTS,atempo={p['speed']},"
+                       f"volume={p['audio_gain_db']}dB,"
+                       f"aresample={AUDIO_RATE},adelay={pad}S:all=1,apad",
                 "-c:a", "aac", "-b:a", AUDIO_BITRATE, "-ar", str(AUDIO_RATE)]
     cmd += ["-c:v", "libx264", "-profile:v", "high", "-preset", "slow",
             "-crf", str(CRF), "-maxrate", "20M", "-bufsize", "40M",
@@ -148,7 +169,20 @@ def render(src, dst, p, fps, video, has_audio):
 
 
 def combo_key(row):
-    return tuple(str(row[f]) for f in COMBO_FIELDS)
+    return tuple(str(row.get(f, "")) for f in COMBO_FIELDS)
+
+
+def upgrade_log(log_path):
+    """Rewrite an older log under the current header so new columns line up."""
+    with log_path.open(newline="") as f:
+        reader = csv.DictReader(f)
+        if reader.fieldnames == LOG_FIELDS:
+            return
+        rows = list(reader)
+    with log_path.open("w", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=LOG_FIELDS, restval="")
+        writer.writeheader()
+        writer.writerows(rows)
 
 
 def main():
@@ -167,6 +201,7 @@ def main():
 
     used = {}
     if log_path.exists():
+        upgrade_log(log_path)
         with log_path.open(newline="") as f:
             for row in csv.DictReader(f):
                 used.setdefault(row["original"], set()).add(combo_key(row))
@@ -204,7 +239,8 @@ def main():
                     **p, "crf": CRF, "audio_bitrate": AUDIO_BITRATE,
                 })
                 log_file.flush()
-                print(f"{dst}  zoom={p['zoom']} rot={p['rotation_deg']} "
+                print(f"{dst}  zoom={p['zoom']} speed={p['speed']} "
+                      f"trim=({p['trim_start']},{p['trim_end']}) "
                       f"offset=({p['offset_x']},{p['offset_y']})")
 
 
