@@ -41,7 +41,7 @@ FLASH_HALF = 0.25  # fade to white over this long before a cut, and back after
 # within half a second of this. Update it when the song changes.
 DROP_NEAR_SECS = 3.5
 MAX_CLIP_SECS = 2.0
-# TikTok Sans or Proxima Nova if their file is in assets/fonts, else
+# Proxima Nova (or TikTok Sans) if its file is in assets/fonts, else
 # Montserrat SemiBold, the closest free match
 FONT_DIR = Path("assets/fonts")
 FALLBACK_FONT = "/usr/share/fonts/opentype/montserrat/Montserrat-SemiBold.otf"
@@ -138,6 +138,7 @@ def font_path():
     fonts = sorted(p for p in FONT_DIR.glob("*")
                    if p.suffix.lower() in (".otf", ".ttf")
                    and any(k in p.name.lower() for k in ("tiktok", "proxima")))
+    fonts.sort(key=lambda p: "proxima" not in p.name.lower())  # Proxima first
     return str(fonts[0]) if fonts else FALLBACK_FONT
 
 
