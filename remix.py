@@ -37,7 +37,14 @@ IMAGE_SECS = 1.0
 PROFILE_SECS = 1.8
 FLASH_HALF = 0.25  # fade to white over this long before a cut, and back after
 DEFAULT_DROP = 1.0
-FONT = "/usr/share/fonts/opentype/inter/Inter-SemiBold.otf"
+# Proxima Nova Semibold if its file is in assets/fonts, else Montserrat
+# SemiBold, the closest free match
+FONT_DIR = Path("assets/fonts")
+FALLBACK_FONT = "/usr/share/fonts/opentype/montserrat/Montserrat-SemiBold.otf"
+TEXT_SQUEEZE = 0.82    # horizontal squeeze of the hook text
+TEXT_MAX_WIDTH = 0.76  # of the frame, clear of the like/comment buttons
+# Assets the user rejected; skipped even if they are in the folder
+EXCLUDED = {"IMG_1624.PNG"}
 VIDEO_EXTS = {".mov", ".mp4", ".m4v"}
 IMAGE_EXTS = {".png", ".jpg", ".jpeg", ".webp"}
 AUDIO_EXTS = {".mp3", ".m4a", ".wav", ".aac"}
@@ -71,6 +78,8 @@ def classify(raw_dir):
     clips, water, profiles = [], [], []
     for p in sorted(raw_dir.iterdir()):
         ext = p.suffix.lower()
+        if p.name in EXCLUDED:
+            continue
         if ext in VIDEO_EXTS and not p.name.lower().startswith("trial"):
             clips.append(p)
         elif ext in IMAGE_EXTS:
@@ -122,27 +131,43 @@ def split_hook(hook):
     return " ".join(words[:mid]), " ".join(words[mid:])
 
 
-def text_overlay(hook, dst, rng):
-    """Transparent 1080x1920 PNG: white text with a black outline."""
+def font_path():
+    proxima = sorted(p for p in FONT_DIR.glob("*")
+                     if "proxima" in p.name.lower()
+                     and p.suffix.lower() in (".otf", ".ttf"))
+    return str(proxima[0]) if proxima else FALLBACK_FONT
+
+
+def text_overlay(hook, profile, dst, rng):
+    """Transparent 1080x1920 PNG: white text with a black outline, squeezed
+    horizontally and kept narrow so it stays clear of the side buttons."""
     lines = split_hook(hook)
-    size = int(64 * rng.uniform(0.97, 1.03))
+    size = int(62 * rng.uniform(0.97, 1.03))
     while True:
-        font = ImageFont.truetype(FONT, size)
-        if max(font.getlength(line) for line in lines) <= 0.86 * W:
+        font = ImageFont.truetype(font_path(), size)
+        widest = max(font.getlength(line) for line in lines)
+        if widest * TEXT_SQUEEZE <= TEXT_MAX_WIDTH * W:
             break
         size -= 2
-    img = Image.new("RGBA", (W, H), (0, 0, 0, 0))
-    draw = ImageDraw.Draw(img)
     line_h = int(size * 1.22)
-    # Upper area: above the images (whole on black) and over the sky in the
-    # clips, so the water is never covered
-    centre_y = int(H * rng.uniform(0.155, 0.17))
-    top = centre_y - line_h * len(lines) // 2
     stroke = max(3, size // 14)
+    pad = stroke * 2
+    block = Image.new("RGBA", (int(widest) + 2 * pad,
+                               line_h * len(lines) + 2 * pad), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(block)
     for n, line in enumerate(lines):
-        x = (W - font.getlength(line)) / 2
-        draw.text((x, top + n * line_h), line, font=font, fill="white",
+        x = pad + (widest - font.getlength(line)) / 2
+        draw.text((x, pad + n * line_h), line, font=font, fill="white",
                   stroke_width=stroke, stroke_fill="black")
+    block = block.resize((int(block.width * TEXT_SQUEEZE), block.height),
+                         Image.LANCZOS)
+    # Towards the middle, but sitting just above the profile screenshot (shown
+    # whole on black at the end) so it never covers the name or counts
+    pw, ph = Image.open(profile).size
+    shot_top = (H - min(H, ph * W / pw)) / 2
+    bottom = int(shot_top - rng.uniform(20, 40))
+    img = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+    img.paste(block, ((W - block.width) // 2, bottom - block.height), block)
     img.save(dst)
 
 
@@ -240,7 +265,7 @@ def main():
     clip, (image1, image2), profile, hook = rng.choice(fresh_hook or options)
 
     # The clip runs until the drop, so the first flash lands on the beat
-    clip_secs = drop
+    clip_secs = round(drop * FPS) / FPS  # cut on the frame nearest the drop
     _, clip_len = probe(clip)
     earliest = POUR_START.get(clip.name, 0.3)
     latest = max(earliest, clip_len - clip_secs - 0.05)
@@ -253,7 +278,7 @@ def main():
     n = len(used) + 1
     dst = out_dir / f"remix_{n:03d}.mp4"
     text_png = out_dir / f".text_{n:03d}.png"
-    text_overlay(hook, text_png, rng)
+    text_overlay(hook, profile, text_png, rng)
     total = render(p, text_png, dst)
     text_png.unlink()
 
