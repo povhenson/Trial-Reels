@@ -45,7 +45,7 @@ MAX_CLIP_SECS = 2.0
 # Montserrat SemiBold, the closest free match
 FONT_DIR = Path("assets/fonts")
 FALLBACK_FONT = "/usr/share/fonts/opentype/montserrat/Montserrat-SemiBold.otf"
-TEXT_SQUEEZE = 0.82    # horizontal squeeze of the hook text
+TEXT_SQUEEZE = 1.0     # horizontal squeeze of the hook text (1.0 = none)
 TEXT_MAX_WIDTH = 0.76  # of the frame, clear of the like/comment buttons
 # Assets the user rejected; skipped even if they are in the folder
 EXCLUDED = {"IMG_1624.PNG"}
