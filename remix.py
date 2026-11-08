@@ -2,7 +2,8 @@
 """Build a fresh remix reel from the asset pool, following the TikTok edit.
 
 Structure (about 5 seconds, 1080x1920, 30fps):
-  1. A window of one sand clip, ending exactly on the song's beat drop
+  1. The pouring part of one sand clip (up to 2s); the song is started so
+     its beat drop lands exactly on the cut out of this clip
   2. Water image (shown whole on black)          1.0s
   3. Second water image (whole on black)         1.0s
   4. Profile screenshot (whole on black)         1.8s
@@ -36,9 +37,12 @@ W, H, FPS = 1080, 1920, 30
 IMAGE_SECS = 1.0
 PROFILE_SECS = 1.8
 FLASH_HALF = 0.25  # fade to white over this long before a cut, and back after
-DEFAULT_DROP = 1.0
-# Proxima Nova Semibold if its file is in assets/fonts, else Montserrat
-# SemiBold, the closest free match
+# Roughly where the current song's beat drop is; the exact bass hit is found
+# within half a second of this. Update it when the song changes.
+DROP_NEAR_SECS = 3.5
+MAX_CLIP_SECS = 2.0
+# TikTok Sans or Proxima Nova if their file is in assets/fonts, else
+# Montserrat SemiBold, the closest free match
 FONT_DIR = Path("assets/fonts")
 FALLBACK_FONT = "/usr/share/fonts/opentype/montserrat/Montserrat-SemiBold.otf"
 TEXT_SQUEEZE = 0.82    # horizontal squeeze of the hook text
@@ -61,7 +65,8 @@ HOOKS = [
     "POV: How it feels giving a follow to a small creator",
 ]
 LOG_FIELDS = ["created", "output", "clip", "clip_start", "clip_secs",
-              "image1", "image2", "profile", "hook", "song", "drop_secs"]
+              "image1", "image2", "profile", "hook", "song", "drop_secs",
+              "song_start"]
 
 
 def probe(path):
@@ -96,12 +101,10 @@ def newest_song(sound_dir):
     return max(songs, key=lambda p: p.stat().st_mtime)
 
 
-def find_drop(song, lo=0.6, hi=2.0):
-    """Time of the first bass hit after a quiet gap, between lo and hi secs.
-
-    The songs come pre-trimmed so the drop lands around the end of the
-    one-second clip; this finds it exactly from the low-frequency envelope.
-    """
+def find_drop(song, near=DROP_NEAR_SECS):
+    """Time of the first bass hit after a quiet gap, within 0.5s of `near`,
+    found from the low-frequency envelope."""
+    lo, hi = near - 0.5, near + 0.5
     raw = subprocess.run(
         ["ffmpeg", "-v", "error", "-i", str(song), "-af",
          "lowpass=f=120,lowpass=f=120", "-ac", "1", "-ar", "8000",
@@ -118,7 +121,7 @@ def find_drop(song, lo=0.6, hi=2.0):
         if (lo <= t <= hi and not quiet[i] and all(quiet[i - 4:i])
                 and max(env[i:i + 4]) > peak - 12):
             return round(t, 3)
-    return DEFAULT_DROP
+    return near
 
 
 def split_hook(hook):
@@ -132,10 +135,10 @@ def split_hook(hook):
 
 
 def font_path():
-    proxima = sorted(p for p in FONT_DIR.glob("*")
-                     if "proxima" in p.name.lower()
-                     and p.suffix.lower() in (".otf", ".ttf"))
-    return str(proxima[0]) if proxima else FALLBACK_FONT
+    fonts = sorted(p for p in FONT_DIR.glob("*")
+                   if p.suffix.lower() in (".otf", ".ttf")
+                   and any(k in p.name.lower() for k in ("tiktok", "proxima")))
+    return str(fonts[0]) if fonts else FALLBACK_FONT
 
 
 def text_overlay(hook, profile, dst, rng):
@@ -206,7 +209,8 @@ def render(p, text_png, dst):
         still(3, PROFILE_SECS, True, False) + "[pr]",
         "[c][i1][i2][pr]concat=n=4:v=1:a=0[seq]",
         "[seq][4:v]overlay=0:0:format=auto,format=yuv420p[v]",
-        f"[5:a]atrim=0:{total},asetpts=PTS-STARTPTS,"
+        f"[5:a]atrim={p['song_start']}:{p['song_start'] + total},"
+        "asetpts=PTS-STARTPTS,"
         f"afade=t=out:st={total - 0.3}:d=0.3[a]",
     ])
     loop = lambda secs, path: ["-loop", "1", "-framerate", str(FPS),
@@ -265,13 +269,17 @@ def main():
     clip, (image1, image2), profile, hook = rng.choice(fresh_hook or options)
 
     # The clip runs until the drop, so the first flash lands on the beat
-    clip_secs = round(drop * FPS) / FPS  # cut on the frame nearest the drop
+    # The clip is its whole pouring part (up to MAX_CLIP_SECS), and the song
+    # starts early enough that the drop lands on the cut out of the clip
     _, clip_len = probe(clip)
-    earliest = POUR_START.get(clip.name, 0.3)
-    latest = max(earliest, clip_len - clip_secs - 0.05)
-    p = {"clip": clip, "clip_start": round(rng.uniform(earliest, latest), 2),
-         "clip_secs": clip_secs, "image1": image1, "image2": image2,
-         "profile": profile, "hook": hook, "song": song}
+    pour = POUR_START.get(clip.name, 0.3)
+    clip_secs = math.floor(min(MAX_CLIP_SECS, clip_len - pour - 0.05)
+                           * FPS) / FPS
+    clip_start = round(rng.uniform(pour, clip_len - clip_secs - 0.05), 2)
+    song_start = round(max(0.0, drop - clip_secs), 3)
+    p = {"clip": clip, "clip_start": clip_start, "clip_secs": clip_secs,
+         "image1": image1, "image2": image2, "profile": profile,
+         "hook": hook, "song": song, "song_start": song_start}
 
     out_dir = Path(args.out)
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -293,9 +301,10 @@ def main():
             "clip_start": p["clip_start"], "clip_secs": clip_secs,
             "image1": image1.name, "image2": image2.name,
             "profile": profile.name, "hook": hook, "song": song.name,
-            "drop_secs": drop,
+            "drop_secs": drop, "song_start": song_start,
         })
-    print(f"{dst}  {total:.2f}s  drop={drop}s  clip={clip.name}"
+    print(f"{dst}  {total:.2f}s  drop={drop}s (song from {song_start}s)"
+          f"  clip={clip.name}"
           f"@{p['clip_start']}  images={image1.name},{image2.name}  "
           f"profile={profile.name}\n  hook: {hook}")
 
