@@ -61,6 +61,11 @@ Zernio `call_tool` → `posts_create_post` with:
 
 The response must show `isTrialReel: True`.
 
+**These reels must never reach the main feed.** Always send
+`trialParams` with `graduationStrategy: "MANUAL"`: never `SS_PERFORMANCE`
+(which auto-graduates to followers), never post without `trialParams`, and
+never graduate, share to feed or re-post a reel to followers.
+
 ## 5. Record it
 
 Append a row to `zernio_posts.csv` (`posted,output,zernio_post_id`), then

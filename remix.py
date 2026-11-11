@@ -11,7 +11,10 @@ Structure (about 5 seconds, 1080x1920, 30fps):
   the newest song in assets/sounds as the only audio (clip sound muted).
 
 Each run picks a combination of clip, two of the water images (in order),
-profile screenshot and hook line that is not in remix_log.csv yet.
+profile screenshot and hook line that is not in remix_log.csv yet. Two runs
+in three favour what performs best (FAVOURED): the first of every three uses
+the favoured clip and hook, the second just the favoured clip, and the third
+is fully random so new winners can still turn up.
 
 Assets live in assets/raw (from the Drive folder). Videos are clips (the old
 finished trial* reels are skipped); dark images are profile screenshots,
@@ -64,9 +67,12 @@ HOOKS = [
     "POV: How it feels when you follow a small account",
     "POV: How it feels giving a follow to a small creator",
 ]
+# Best performer so far (remix_008: 23 follows vs about 5 for the rest)
+FAVOURED = {"clip": "IMG_1995.mov",
+            "hook": "POV: How it feels giving a follow to a small creator"}
 LOG_FIELDS = ["created", "output", "clip", "clip_start", "clip_secs",
               "image1", "image2", "profile", "hook", "song", "drop_secs",
-              "song_start"]
+              "song_start", "mode"]
 
 
 def probe(path):
@@ -229,6 +235,19 @@ def render(p, text_png, dst):
     return total
 
 
+def upgrade_log(log_path):
+    """Rewrite an older log under the current header so new columns line up."""
+    with log_path.open(newline="") as f:
+        reader = csv.DictReader(f)
+        if reader.fieldnames == LOG_FIELDS:
+            return
+        rows = list(reader)
+    with log_path.open("w", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=LOG_FIELDS, restval="")
+        writer.writeheader()
+        writer.writerows(rows)
+
+
 def combo_key(clip, image1, image2, profile, hook):
     return (Path(clip).name, Path(image1).name, Path(image2).name,
             Path(profile).name, hook)
@@ -255,6 +274,7 @@ def main():
     log_path = Path(args.log)
     used, last_hook = set(), None
     if log_path.exists():
+        upgrade_log(log_path)
         with log_path.open(newline="") as f:
             for row in csv.DictReader(f):
                 used.add(combo_key(row["clip"], row["image1"], row["image2"],
@@ -266,8 +286,20 @@ def main():
         if combo_key(c[0], *c[1], c[2], c[3]) not in used]
     if not options:
         raise SystemExit("Every combination has been used: add more assets")
-    fresh_hook = [c for c in options if c[3] != last_hook]
-    clip, (image1, image2), profile, hook = rng.choice(fresh_hook or options)
+    # Rotate: favoured clip + hook, favoured clip, then fully random. Fall
+    # back to a looser pick when the favoured combinations run out.
+    mode = ["favour-clip-hook", "favour-clip", "explore"][len(used) % 3]
+    fav_clip = [c for c in options if c[0].name == FAVOURED["clip"]]
+    fav_both = [c for c in fav_clip if c[3] == FAVOURED["hook"]]
+    if mode == "favour-clip-hook" and fav_both:
+        pool = fav_both
+    elif mode != "explore" and fav_clip:
+        mode = "favour-clip"
+        pool = [c for c in fav_clip if c[3] != last_hook] or fav_clip
+    else:
+        mode = "explore"
+        pool = [c for c in options if c[3] != last_hook] or options
+    clip, (image1, image2), profile, hook = rng.choice(pool)
 
     # The clip runs until the drop, so the first flash lands on the beat
     # The clip is its whole pouring part (up to MAX_CLIP_SECS), and the song
@@ -302,9 +334,9 @@ def main():
             "clip_start": p["clip_start"], "clip_secs": clip_secs,
             "image1": image1.name, "image2": image2.name,
             "profile": profile.name, "hook": hook, "song": song.name,
-            "drop_secs": drop, "song_start": song_start,
+            "drop_secs": drop, "song_start": song_start, "mode": mode,
         })
-    print(f"{dst}  {total:.2f}s  drop={drop}s (song from {song_start}s)"
+    print(f"[{mode}] {dst}  {total:.2f}s  drop={drop}s (song from {song_start}s)"
           f"  clip={clip.name}"
           f"@{p['clip_start']}  images={image1.name},{image2.name}  "
           f"profile={profile.name}\n  hook: {hook}")
