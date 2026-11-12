@@ -1,12 +1,13 @@
-created,output,clip,clip_start,clip_secs,image1,image2,profile,hook,song,drop_secs,song_start
-2026-11-08T16:42:31,remix_001.mp4,IMG_1995.mov,0.33,2.0,IMG_1619.PNG,IMG_1621.WEBP,IMG_1614.PNG,POV: How it feels following a small creator,song.mp3,3.55,1.55
-2026-11-08T19:43:45,remix_002.mp4,IMG_1995.mov,0.41,2.0,IMG_1620.JPG,IMG_1619.PNG,IMG_1637.PNG,POV: How it feels to follow a small creator,song.mp3,3.55,1.55
-2026-11-09T13:43:39,remix_003.mp4,IMG_2059.mov,0.56,1.6666666666666667,IMG_1621.WEBP,IMG_1619.PNG,IMG_1637.PNG,POV: How it feels giving a follow to a small creator,song.mp3,3.55,1.883
-2026-11-09T16:43:34,remix_004.mp4,IMG_2059.mov,0.57,1.6666666666666667,IMG_1620.JPG,IMG_1619.PNG,IMG_1637.PNG,POV: How it feels to follow an underrated creator,song.mp3,3.55,1.883
-2026-11-09T19:43:22,remix_005.mp4,IMG_2059.mov,0.57,1.6666666666666667,IMG_1621.WEBP,IMG_1619.PNG,IMG_1614.PNG,POV: How it feels giving a follow to a small creator,song.mp3,3.55,1.883
-2026-11-10T13:44:17,remix_006.mp4,IMG_2059.mov,0.55,1.6666666666666667,IMG_1621.WEBP,IMG_1619.PNG,IMG_1614.PNG,POV: How it feels subscribing to a small creator,song.mp3,3.55,1.883
-2026-11-10T16:43:18,remix_007.mp4,IMG_1995.mov,0.47,2.0,IMG_1621.WEBP,IMG_1619.PNG,IMG_1614.PNG,POV: How it feels when you follow a small account,song.mp3,3.55,1.55
-2026-11-10T19:43:10,remix_008.mp4,IMG_1995.mov,0.37,2.0,IMG_1621.WEBP,IMG_1619.PNG,IMG_1637.PNG,POV: How it feels giving a follow to a small creator,song.mp3,3.55,1.55
-2026-11-11T13:43:46,remix_009.mp4,IMG_2059.mov,0.57,1.6666666666666667,IMG_1621.WEBP,IMG_1619.PNG,IMG_1637.PNG,POV: How it feels subscribing to a small creator,song.mp3,3.55,1.883
-2026-11-11T16:43:14,remix_010.mp4,IMG_2059.mov,0.57,1.6666666666666667,IMG_1619.PNG,IMG_1620.JPG,IMG_1637.PNG,POV: How it feels giving a follow to a small creator,song.mp3,3.55,1.883
-2026-11-11T19:43:15,remix_011.mp4,IMG_1995.mov,0.34,2.0,IMG_1619.PNG,IMG_1621.WEBP,IMG_1614.PNG,POV: How it feels dropping a follow for a small creator,song.mp3,3.55,1.55
+created,output,clip,clip_start,clip_secs,image1,image2,profile,hook,song,drop_secs,song_start,mode
+2026-11-08T16:42:31,remix_001.mp4,IMG_1995.mov,0.33,2.0,IMG_1619.PNG,IMG_1621.WEBP,IMG_1614.PNG,POV: How it feels following a small creator,song.mp3,3.55,1.55,
+2026-11-08T19:43:45,remix_002.mp4,IMG_1995.mov,0.41,2.0,IMG_1620.JPG,IMG_1619.PNG,IMG_1637.PNG,POV: How it feels to follow a small creator,song.mp3,3.55,1.55,
+2026-11-09T13:43:39,remix_003.mp4,IMG_2059.mov,0.56,1.6666666666666667,IMG_1621.WEBP,IMG_1619.PNG,IMG_1637.PNG,POV: How it feels giving a follow to a small creator,song.mp3,3.55,1.883,
+2026-11-09T16:43:34,remix_004.mp4,IMG_2059.mov,0.57,1.6666666666666667,IMG_1620.JPG,IMG_1619.PNG,IMG_1637.PNG,POV: How it feels to follow an underrated creator,song.mp3,3.55,1.883,
+2026-11-09T19:43:22,remix_005.mp4,IMG_2059.mov,0.57,1.6666666666666667,IMG_1621.WEBP,IMG_1619.PNG,IMG_1614.PNG,POV: How it feels giving a follow to a small creator,song.mp3,3.55,1.883,
+2026-11-10T13:44:17,remix_006.mp4,IMG_2059.mov,0.55,1.6666666666666667,IMG_1621.WEBP,IMG_1619.PNG,IMG_1614.PNG,POV: How it feels subscribing to a small creator,song.mp3,3.55,1.883,
+2026-11-10T16:43:18,remix_007.mp4,IMG_1995.mov,0.47,2.0,IMG_1621.WEBP,IMG_1619.PNG,IMG_1614.PNG,POV: How it feels when you follow a small account,song.mp3,3.55,1.55,
+2026-11-10T19:43:10,remix_008.mp4,IMG_1995.mov,0.37,2.0,IMG_1621.WEBP,IMG_1619.PNG,IMG_1637.PNG,POV: How it feels giving a follow to a small creator,song.mp3,3.55,1.55,
+2026-11-11T13:43:46,remix_009.mp4,IMG_2059.mov,0.57,1.6666666666666667,IMG_1621.WEBP,IMG_1619.PNG,IMG_1637.PNG,POV: How it feels subscribing to a small creator,song.mp3,3.55,1.883,
+2026-11-11T16:43:14,remix_010.mp4,IMG_2059.mov,0.57,1.6666666666666667,IMG_1619.PNG,IMG_1620.JPG,IMG_1637.PNG,POV: How it feels giving a follow to a small creator,song.mp3,3.55,1.883,
+2026-11-11T19:43:15,remix_011.mp4,IMG_1995.mov,0.34,2.0,IMG_1619.PNG,IMG_1621.WEBP,IMG_1614.PNG,POV: How it feels dropping a follow for a small creator,song.mp3,3.55,1.55,
+2026-11-12T13:43:57,remix_012.mp4,IMG_2059.mov,0.55,1.6666666666666667,IMG_1619.PNG,IMG_1621.WEBP,IMG_1614.PNG,POV: How it feels to follow a small creator,song.mp3,3.55,1.883,explore
